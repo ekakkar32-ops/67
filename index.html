@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Principal Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+        }
+
+        .stat-bar-container {
+            width: 100%;
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            height: 0.75rem;
+            overflow: hidden;
+        }
+
+        .stat-bar {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out;
+        }
+
+        .action-button {
+            transition: all 0.2s;
+        }
+
+        .action-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .action-button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .action-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #log-container {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 transparent;
+        }
+
+        #log-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #log-container::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 3px;
+        }
+
+        .log-entry {
+            animation: slideIn 0.3s ease-out forwards;
+            opacity: 0;
+            transform: translateX(-10px);
+        }
+
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            width: 90%;
+            max-width: 500px;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.show .modal-content {
+            transform: scale(1);
+        }
+        
+        .list-item:hover {
+            background-color: #f3f4f6;
+            cursor: pointer;
+        }
+        
+        .selected-item {
+            background-color: #e0f2fe;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .pulse-red {
+             animation: pulseRed 2s infinite;
+        }
+
+        @keyframes pulseRed {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .tab-btn {
+            transition: all 0.2s;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn.active {
+            color: #2563eb;
+            border-bottom: 2px solid #2563eb;
+            background-color: #eff6ff;
+        }
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        .tab-content.active {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .badge {
+            background: #ef4444;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 9999px;
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            display: none;
+        }
+        .badge.show { display: inline-block; }
+
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex flex-col">
+
+    <!-- Header -->
+    <header class="mb-8 text-center">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-blue-900 tracking-tight flex items-center justify-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
+            </svg>
+            Principal Simulator
+        </h1>
+        <p class="text-gray-600 mt-2 font-medium">Manage Oakridge High. Maintain order, budget, and reputation.</p>
+    </header>
+
+    <main class="flex-grow max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left Column: School Stats & Info -->
+        <div class="lg:col-span-1 space-y-6">
+            
+            <!-- Dashboard Card -->
+            <div class="glass-panel p-6 rounded-2xl">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    School Dashboard
+                </h2>
+                
+                <div class="space-y-4">
+                    <!-- Reputation -->
+                    <div>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>Reputation</span>
+                            <span id="rep-val">50%</span>
+                        </div>
+                        <div class="stat-bar-container">
+                            <div id="rep-bar" class="stat-bar bg-blue-500" style="width: 50%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Budget -->
+                    <div>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>Budget</span>
+                            <span id="budget-val" class="text-green-600">$50,000</span>
+                        </div>
+                        <div class="stat-bar-container">
+                            <div id="budget-bar" class="stat-bar bg-green-500" style="width: 50%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Student Happiness -->
+                    <div>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>Student Morale</span>
+                            <span id="student-hap-val">60%</span>
+                        </div>
+                        <div class="stat-bar-container">
+                            <div id="student-hap-bar" class="stat-bar bg-yellow-400" style="width: 60%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Teacher Happiness -->
+                    <div>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>Teacher Morale</span>
+                            <span id="teacher-hap-val">60%</span>
+                        </div>
+                        <div class="stat-bar-container">
+                            <div id="teacher-hap-bar" class="stat-bar bg-purple-500" style="width: 60%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Discipline Level -->
+                    <div>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>Discipline</span>
+                            <span id="discipline-val">40%</span>
+                        </div>
+                        <div class="stat-bar-container">
+                            <div id="discipline-bar" class="stat-bar bg-red-500" style="width: 40%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Academics -->
+                    <div>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>Academics</span>
+                            <span id="academics-val">60%</span>
+                        </div>
+                        <div class="stat-bar-container">
+                            <div id="academics-bar" class="stat-bar bg-teal-500" style="width: 60%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Athletics -->
+                    <div>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>Athletics</span>
+                            <span id="athletics-val">40%</span>
+                        </div>
+                        <div class="stat-bar-container">
+                            <div id="athletics-bar" class="stat-bar bg-orange-500" style="width: 40%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- School Info -->
+            <div class="glass-panel p-6 rounded-2xl">
+                <h3 class="text-lg font-bold mb-3 text-gray-800">Population</h3>
+                <div class="grid grid-cols-2 gap-4 text-center">
+                    <div class="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <div class="text-2xl font-bold text-blue-700" id="student-count">500</div>
+                        <div class="text-xs text-blue-500 uppercase tracking-wide font-semibold">Students</div>
+                    </div>
+                    <div class="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                        <div class="text-2xl font-bold text-purple-700" id="teacher-count">30</div>
+                        <div class="text-xs text-purple-500 uppercase tracking-wide font-semibold">Teachers</div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 text-center mt-4">
+                    <div class="bg-orange-50 p-2 rounded-lg border border-orange-100">
+                        <div class="text-lg font-bold text-orange-700" id="cafeteria-count">0</div>
+                        <div class="text-xs text-orange-500 uppercase tracking-wide font-semibold">Cafeteria</div>
+                    </div>
+                    <div class="bg-teal-50 p-2 rounded-lg border border-teal-100">
+                        <div class="text-lg font-bold text-teal-700" id="reception-count">0</div>
+                        <div class="text-xs text-teal-500 uppercase tracking-wide font-semibold">Reception</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 text-center mt-4">
+                    <div class="bg-blue-50 p-2 rounded-lg border border-blue-100">
+                        <div class="text-lg font-bold text-blue-700" id="classroom-count">20</div>
+                        <div class="text-xs text-blue-500 uppercase tracking-wide font-semibold">Classrooms</div>
+                    </div>
+                    <div class="bg-yellow-50 p-2 rounded-lg border border-yellow-100">
+                        <div class="text-lg font-bold text-yellow-700" id="sports-facility-count">0</div>
+                        <div class="text-xs text-yellow-500 uppercase tracking-wide font-semibold">Sports Facs</div>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <p class="text-sm text-red-800 font-medium">Expulsions: <span id="expelled-count">0</span></p>
+                    <p class="text-sm text-red-800 font-medium mt-1">Fired Staff: <span id="fired-count">0</span></p>
+                </div>
+            </div>
+            
+            <button id="next-day-btn" class="w-full py-4 bg-gray-800 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-gray-700 transition action-button">
+                Advance to Next Day
+            </button>
+            <button onclick="simulateYear()" id="sim-year-btn" class="w-full mt-3 py-3 bg-indigo-700 text-white rounded-xl font-bold text-md shadow-lg hover:bg-indigo-600 transition action-button">
+                Simulate Year (180 Days)
+            </button>
+            <div class="text-center text-sm font-medium text-gray-500 mt-2">Day: <span id="day-counter">1</span></div>
+        </div>
+
+        <div class="lg:col-span-2 flex flex-col gap-6">
+            
+            <!-- Tab Navigation -->
+            <div class="glass-panel p-2 rounded-2xl flex gap-1 relative overflow-x-auto shadow-sm">
+                <button onclick="switchTab('actions-tab')" id="btn-actions-tab" class="tab-btn active flex-1 py-3 px-2 sm:px-4 font-bold rounded-lg text-gray-600 hover:bg-gray-50 text-sm sm:text-base whitespace-nowrap relative">Actions <span id="actions-badge" class="badge">!</span></button>
+                <button onclick="switchTab('hiring-tab')" id="btn-hiring-tab" class="tab-btn flex-1 py-3 px-2 sm:px-4 font-bold rounded-lg text-gray-600 hover:bg-gray-50 relative text-sm sm:text-base whitespace-nowrap">Hiring <span id="hiring-badge" class="badge">!</span></button>
+                <button onclick="switchTab('facilities-tab')" id="btn-facilities-tab" class="tab-btn flex-1 py-3 px-2 sm:px-4 font-bold rounded-lg text-gray-600 hover:bg-gray-50 relative text-sm sm:text-base whitespace-nowrap">Facilities</button>
+                <button onclick="switchTab('schedule-tab')" id="btn-schedule-tab" class="tab-btn flex-1 py-3 px-2 sm:px-4 font-bold rounded-lg text-gray-600 hover:bg-gray-50 relative text-sm sm:text-base whitespace-nowrap">Schedule <span id="schedule-badge" class="badge">!</span></button>
+                <button onclick="switchTab('rules-tab')" id="btn-rules-tab" class="tab-btn flex-1 py-3 px-2 sm:px-4 font-bold rounded-lg text-gray-600 hover:bg-gray-50 relative text-sm sm:text-base whitespace-nowrap">Rules</button>
+                <button onclick="switchTab('tuitions-tab')" id="btn-tuitions-tab" class="tab-btn flex-1 py-3 px-2 sm:px-4 font-bold rounded-lg text-gray-600 hover:bg-gray-50 relative text-sm sm:text-base whitespace-nowrap">Tuitions</button>
+                <button onclick="switchTab('news-tab')" id="btn-news-tab" class="tab-btn flex-1 py-3 px-2 sm:px-4 font-bold rounded-lg text-gray-600 hover:bg-gray-50 relative text-sm sm:text-base whitespace-nowrap">News <span id="news-badge" class="badge">1</span></button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="glass-panel p-6 rounded-2xl flex-grow flex flex-col min-h-[500px]">
+                
+                <!-- Tab: Actions -->
+                <div id="actions-tab" class="tab-content active h-full flex-col">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                        Principal's Actions
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 flex-grow">
+                        
+                        <!-- Students in Office -->
+                        <div class="space-y-3 flex flex-col h-full">
+                            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider border-b pb-1 flex justify-between items-center">
+                                Students in Office <span id="office-count" class="bg-red-500 text-white px-2 py-0.5 rounded-full text-xs">0</span>
+                            </h3>
+                            <div id="office-list" class="flex-grow overflow-y-auto space-y-2 bg-gray-50 p-2 rounded-lg border border-gray-200 min-h-[250px]">
+                                <!-- Students injected here -->
+                            </div>
+                        </div>
+
+                        <!-- Staff & Parent Actions -->
+                        <div class="space-y-3 flex flex-col">
+                            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider border-b pb-1">Staff & Parent Actions</h3>
+                            
+                            <button onclick="openModal('meeting')" class="action-button w-full flex items-center p-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-green-300 group">
+                                <div class="bg-green-100 p-2 rounded-md mr-3 group-hover:bg-green-500 group-hover:text-white transition">
+                                    👨‍👩‍👧
+                                </div>
+                                <div class="text-left">
+                                    <div class="font-bold text-gray-800">Parent-Teacher Mtg</div>
+                                    <div class="text-xs text-gray-500">Costs $500, boosts Rep & Morale</div>
+                                </div>
+                            </button>
+
+                            <button onclick="openModal('fire')" class="action-button w-full flex items-center p-3 bg-white border border-red-200 rounded-lg shadow-sm hover:border-red-500 hover:bg-red-50 group">
+                                <div class="bg-red-100 p-2 rounded-md mr-3 group-hover:bg-red-600 group-hover:text-white transition">
+                                    📉
+                                </div>
+                                <div class="text-left">
+                                    <div class="font-bold text-red-700">Fire Teacher</div>
+                                    <div class="text-xs text-red-500">Saves Budget, ruins Staff Morale</div>
+                                </div>
+                            </button>
+                            
+                            <button onclick="holdAssembly()" id="assembly-btn" class="action-button w-full flex items-center p-3 bg-purple-50 border border-purple-200 rounded-lg shadow-sm hover:border-purple-500 group mt-auto">
+                                <div class="bg-purple-100 p-2 rounded-md mr-3 group-hover:bg-purple-500 group-hover:text-white transition">
+                                    🎤
+                                </div>
+                                <div class="text-left">
+                                    <div class="font-bold text-purple-800">School Assembly</div>
+                                    <div class="text-xs text-purple-600">Boosts overall morale temporarily</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Hiring -->
+                <div id="hiring-tab" class="tab-content h-full flex-col">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        Job Applicants
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4 border-b pb-4">Review resumes and hire new staff. Note: Hiring incurs a $1,000 onboarding fee per teacher.</p>
+                    <div id="applicants-list" class="overflow-y-auto flex-grow space-y-3 pr-2">
+                        <!-- Applicants injected here -->
+                    </div>
+                </div>
+
+                <!-- Tab: Facilities -->
+                <div id="facilities-tab" class="tab-content h-full flex-col">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        Campus Facilities
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4 border-b pb-4">Expand your campus to accommodate more students and improve extracurriculars. Overcrowded schools suffer severe academic and morale penalties.</p>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow">
+                        <!-- Classroom Build -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col justify-between hover:border-blue-300 transition">
+                            <div>
+                                <div class="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                    📘 Portable Classroom
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Increases student capacity by 25. Prevents overcrowding and boosts school Academics.</p>
+                                <p class="text-sm font-semibold text-gray-700 mt-2">Current Capacity: <span id="capacity-val" class="text-blue-600 font-bold">500</span></p>
+                            </div>
+                            <button id="btn-buy-classroom" onclick="buyFacility('classroom')" class="mt-4 w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-lg shadow transition">
+                                Build ($5,000)
+                            </button>
+                        </div>
+
+                        <!-- Sports Facility -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col justify-between hover:border-orange-300 transition">
+                            <div>
+                                <div class="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                    🏆 Upgrade Sports Field
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Provides better training equipment for the school teams. Increases Athletics and boosts Morale/Reputation.</p>
+                                <p class="text-sm font-semibold text-gray-700 mt-2">Facility Level: <span id="facility-lvl-val" class="text-orange-600 font-bold">0</span></p>
+                            </div>
+                            <button id="btn-buy-sports" onclick="buyFacility('sports')" class="mt-4 w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-lg shadow transition">
+                                Upgrade ($15,000)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Schedule -->
+                <div id="schedule-tab" class="tab-content h-full flex-col">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Master Schedule
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4 border-b pb-4">Assign teachers to core subjects. Unassigned classes cause daily chaos and reputation loss. Assigning teachers to their specialty grants a bonus.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow" id="schedule-container">
+                        <!-- Schedule Dropdowns -->
+                        <div class="p-4 bg-gray-50 border rounded-lg shadow-sm">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Math Department</label>
+                            <select id="sched-Math" class="w-full p-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="assignSchedule('Math', this.value)"></select>
+                        </div>
+                        <div class="p-4 bg-gray-50 border rounded-lg shadow-sm">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Science Department</label>
+                            <select id="sched-Science" class="w-full p-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="assignSchedule('Science', this.value)"></select>
+                        </div>
+                        <div class="p-4 bg-gray-50 border rounded-lg shadow-sm">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">History Department</label>
+                            <select id="sched-History" class="w-full p-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="assignSchedule('History', this.value)"></select>
+                        </div>
+                        <div class="p-4 bg-gray-50 border rounded-lg shadow-sm">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">English Department</label>
+                            <select id="sched-English" class="w-full p-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="assignSchedule('English', this.value)"></select>
+                        </div>
+                        <div class="p-4 bg-gray-50 border rounded-lg shadow-sm">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">P.E. Department</label>
+                            <select id="sched-P.E." class="w-full p-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="assignSchedule('P.E.', this.value)"></select>
+                        </div>
+                        <div class="p-4 bg-gray-50 border rounded-lg shadow-sm">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Language Department</label>
+                            <select id="sched-Language" class="w-full p-2 border rounded border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" onchange="assignSchedule('Language', this.value)"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Rules -->
+                <div id="rules-tab" class="tab-content h-full flex-col">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        School Rulebook
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4 border-b pb-4">Establish custom rules for the student body. Students caught by staff breaking these rules will be sent to your office. Too many rules may reduce student morale.</p>
+                    
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="new-rule-input" class="flex-grow p-3 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="E.g., No running in the halls, No cellphones">
+                        <button onclick="addRule()" class="px-4 py-3 bg-yellow-500 text-white font-bold rounded-lg shadow hover:bg-yellow-600 transition whitespace-nowrap">Add Rule</button>
+                    </div>
+                    
+                    <div id="rules-list" class="overflow-y-auto flex-grow space-y-2 pr-2">
+                        <!-- Rules injected here -->
+                    </div>
+                </div>
+
+                <!-- Tab: Tuitions & Events -->
+                <div id="tuitions-tab" class="tab-content h-full flex-col">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Tuitions & Events
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4 border-b pb-4">Manage school funding drives and host community events to raise money or boost reputation.</p>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow">
+                        <!-- Charge Tuition -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col justify-between hover:border-emerald-300 transition">
+                            <div>
+                                <div class="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                    💰 Facility Fee Surge
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Charge all parents a mandatory $50,000 fee to fund "good classrooms and facilities".</p>
+                                <p class="text-xs font-bold text-red-600 mt-2">Warning: Causes massive reputation and happiness loss!</p>
+                            </div>
+                            <button id="btn-charge-tuition" onclick="chargeTuition()" class="mt-4 w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-lg shadow transition">
+                                Charge Parents (+$50,000)
+                            </button>
+                        </div>
+
+                        <!-- Host Event -->
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col justify-between hover:border-pink-300 transition">
+                            <div>
+                                <div class="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                    🎉 Host School Event
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Host a massive school fair and dance. Costs money but greatly improves community relations and student morale.</p>
+                                <p class="text-xs font-bold text-pink-600 mt-2">Cooldown: <span id="event-cooldown-val">0</span> days</p>
+                            </div>
+                            <button id="btn-host-event" onclick="hostEvent()" class="mt-4 w-full py-2 bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white font-bold rounded-lg shadow transition">
+                                Host Event (-$5,000)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: News / Activity Log -->
+                <div id="news-tab" class="tab-content h-full flex-col">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800 border-b pb-2 flex justify-between items-center">
+                        <span>Daily News & Logs</span>
+                        <span class="text-sm font-normal text-gray-500 flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse"></span>
+                            Live
+                        </span>
+                    </h2>
+                    <div id="log-container" class="flex-grow overflow-y-auto space-y-3 pr-2 relative">
+                        <!-- Log entries will go here -->
+                        <div class="log-entry bg-blue-50 border-l-4 border-blue-500 p-3 rounded shadow-sm text-sm">
+                            <span class="font-bold text-blue-700">[System]</span> Welcome, Principal. A new school year begins. Maintain the budget, manage your staff schedule, and keep chaos to a minimum.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+        </div>
+    </main>
+
+    <!-- Selection Modal (Reusable for different actions) -->
+    <div id="action-modal" class="modal">
+        <div class="modal-content flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-800">Select Target</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <p id="modal-desc" class="text-sm text-gray-600 mb-4"></p>
+            
+            <!-- List Container -->
+            <div id="target-list" class="overflow-y-auto flex-grow mb-4 border rounded-lg divide-y bg-gray-50">
+                <!-- Items injected via JS -->
+            </div>
+            
+            <!-- Action Area -->
+            <div class="mt-auto pt-4 border-t flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                <button id="confirm-action-btn" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 disabled:opacity-50 transition" disabled>
+                    Confirm Action
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Punishment Modal -->
+    <div id="punishment-modal" class="modal">
+        <div class="modal-content max-w-md">
+           <h3 class="text-xl font-bold text-gray-800 border-b pb-2">Disciplinary Action</h3>
+           <p id="punish-student-name" class="font-bold text-lg mt-4 text-gray-900"></p>
+           <p id="punish-student-reason" class="text-sm text-gray-600 mb-5"></p>
+
+           <div class="space-y-2">
+               <p class="text-xs font-bold text-gray-500 uppercase">Select Punishments (Can choose multiple)</p>
+               <label class="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                   <input type="checkbox" id="punish-fine" class="w-5 h-5 mr-3 text-blue-600 rounded">
+                   <div>
+                       <div class="font-bold text-gray-800">Fine Student ($100)</div>
+                       <div class="text-xs text-gray-500">Adds to budget, lowers reputation with parents</div>
+                   </div>
+               </label>
+               <label class="flex items-center p-3 border border-orange-200 rounded-lg hover:bg-orange-50 cursor-pointer transition">
+                   <input type="checkbox" id="punish-suspend" class="w-5 h-5 mr-3 text-orange-600 rounded">
+                   <div>
+                       <div class="font-bold text-orange-700">Suspend Student</div>
+                       <div class="text-xs text-orange-500">Increases discipline, lowers student happiness</div>
+                   </div>
+               </label>
+               <label class="flex items-center p-3 border border-red-200 rounded-lg hover:bg-red-50 cursor-pointer transition">
+                   <input type="checkbox" id="punish-expel" class="w-5 h-5 mr-3 text-red-600 rounded">
+                   <div>
+                       <div class="font-bold text-red-700">Expel Permanently</div>
+                       <div class="text-xs text-red-500">Removes student, huge morale and reputation penalty</div>
+                   </div>
+               </label>
+               <label class="flex items-center p-3 border border-purple-200 rounded-lg hover:bg-purple-50 cursor-pointer transition">
+                   <input type="checkbox" id="punish-meeting" class="w-5 h-5 mr-3 text-purple-600 rounded">
+                   <div>
+                       <div class="font-bold text-purple-700">Schedule Parent Meeting</div>
+                       <div class="text-xs text-purple-500">Talk to them directly. Outcome depends on your conversation.</div>
+                   </div>
+               </label>
+           </div>
+
+           <div class="mt-6 border-t pt-4 flex justify-end gap-3">
+                <button onclick="closePunishmentModal()" class="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                <button onclick="applyPunishment()" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700 transition">
+                    Apply Decision
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="modal" style="z-index: 100;">
+        <div class="modal-content text-center py-8">
+            <h2 class="text-4xl font-extrabold text-red-600 mb-2">FIRED!</h2>
+            <p class="text-xl text-gray-700 mb-6 font-medium">You have been relieved of your duties as Principal.</p>
+            
+            <div class="bg-gray-100 p-4 rounded-lg mb-6 text-left inline-block">
+                <p class="font-bold text-gray-800 mb-2">Reason for termination:</p>
+                <p id="game-over-reason" class="text-red-700">Your school's reputation dropped too low.</p>
+            </div>
+            
+            <div>
+                <p class="mb-4 text-gray-600">You lasted <span id="final-days" class="font-bold text-gray-900">1</span> days.</p>
+                <button onclick="location.reload()" class="px-6 py-3 bg-gray-800 text-white font-bold rounded-lg shadow-lg hover:bg-gray-700 transition action-button w-full max-w-xs">
+                    Start New Career
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parent Meeting Modal -->
+    <div id="parent-meeting-modal" class="modal" style="z-index: 75;">
+        <div class="modal-content flex flex-col h-[80vh] max-h-[600px] w-full max-w-2xl bg-white">
+            <div class="border-b pb-3 mb-3 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-gray-800" id="meeting-title">Meeting with Parents</h3>
+                    <p class="text-xs text-gray-500" id="meeting-context"></p>
+                </div>
+                <button onclick="endParentMeeting()" class="text-sm bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg text-gray-800 font-bold shadow-sm transition">End Meeting</button>
+            </div>
+            
+            <!-- Chat Log -->
+            <div id="meeting-chat-log" class="flex-grow overflow-y-auto space-y-4 p-4 bg-gray-50 border rounded-lg mb-4 flex flex-col">
+                <!-- Messages injected here -->
+            </div>
+            
+            <!-- Input Area -->
+            <div class="flex gap-2 mt-auto pt-2">
+                <input type="text" id="meeting-input" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Type your message to the parents here...">
+                <button onclick="sendMeetingMessage()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-3 rounded-lg shadow transition">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let state = {
+            day: 1,
+            reputation: 65,      // 0-100
+            budget: 50000,       // $$$
+            studentHappiness: 70,// 0-100
+            teacherHappiness: 70,// 0-100
+            discipline: 50,      // 0-100 (High = Strict, Low = Chaos)
+            academics: 60,       // 0-100
+            athletics: 40,       // 0-100
+            
+            students: 500,
+            teachers: 10,        // Lowered initial to emphasize hiring/scheduling
+            receptionists: 0,
+            cafeteriaWorkers: 0,
+            classrooms: 20,      // 20 * 25 = 500 capacity
+            sportsFacilities: 0,
+            expelled: 0,
+            fired: 0,
+            
+            assemblyCooldown: 0,
+            tuitionCooldown: 0,
+            eventCooldown: 0,
+            currentActionType: null,
+            selectedTargetId: null,
+
+            unreadNews: 0,
+            rules: [],
+            schedule: {
+                "Math": null,
+                "Science": null,
+                "History": null,
+                "English": null,
+                "P.E.": null,
+                "Language": null
+            }
+        };
+
+        // Constants
+        const MAX_BUDGET = 100000;
+        const DAILY_BUDGET_DROP = 2000;
+        const TEACHER_SALARY = 150; // Per teacher per day
+        const HIRE_COST = 1000;
+
+        // Data Arrays
+        const firstNames = ["Emma", "Liam", "Olivia", "Noah", "Ava", "Oliver", "Isabella", "Elijah", "Sophia", "Lucas", "Mia", "Mason", "Charlotte", "Logan", "Amelia", "Alexander", "Harper", "Ethan", "Evelyn", "Jacob"];
+        const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"];
+        const subjects = ["Math", "Science", "History", "English", "P.E.", "Art", "Music", "Language"];
+        const jobRoles = ["Teacher", "Teacher", "Teacher", "Receptionist", "Cafeteria Worker"]; // Weighted for applicants
+        
+        const troublemakerReasons = [
+            "was caught skipping class in the bathrooms.",
+            "started a food fight in the cafeteria.",
+            "was caught vandalizing a locker.",
+            "disrupted Mr. Davis's math class repeatedly.",
+            "was caught bullying a younger student.",
+            "set off the fire alarm as a prank.",
+            "was caught smoking behind the gym."
+        ];
+
+        // Active active pool of individuals to interact with
+        let activeTroublemakers = [];
+        let staffList = [];
+        let applicantsList = [];
+        
+        let pendingPunishmentData = null; 
+        const harshWords = ['expel', 'suspend', 'terrible', 'unacceptable', 'bad', 'disappointing', 'punish', 'police', 'fail', 'awful', 'strict'];
+        const softWords = ['help', 'support', 'improve', 'worry', 'concerned', 'potential', 'better', 'good', 'understand', 'counseling'];
+        
+        const parentResponses = {
+            defensive: [
+                "I think you're exaggerating the situation.",
+                "My child says the teachers are targeting them!",
+                "We are very busy, is this really necessary?",
+                "They wouldn't do that. Are you sure you have the right student?",
+                "Well, maybe if the classes were more engaging, this wouldn't happen.",
+                "Kids will be kids. You need to relax your rules."
+            ],
+            apologetic: [
+                "We are so sorry. We will definitely discipline them at home.",
+                "I can't believe they did that. I apologize on their behalf.",
+                "Thank you for bringing this to our attention. It won't happen again.",
+                "We'll take away their phone and ground them.",
+                "This is unacceptable behavior. We fully support the school's decision.",
+                "I'm so embarrassed. We will have a very long talk tonight."
+            ],
+            neutral: [
+                "I understand. We will talk to them tonight.",
+                "Thank you for the update.",
+                "We will see what we can do.",
+                "Okay, we will discuss this behavior at home.",
+                "Is there anything else we need to know?",
+                "We appreciate you letting us know."
+            ],
+            angry: [
+                "This school is a joke! I'm calling the superintendent.",
+                "If you punish them, I'm pulling them out of this school!",
+                "How dare you speak to us like this. This meeting is over.",
+                "You're the principal, fix it yourself! That's what we pay taxes for.",
+                "We are consulting our lawyer. Do not contact us again."
+            ]
+        };
+
+        // Initialize Game
+        function init() {
+            generateStaff();
+            generateApplicants();
+            updateScheduleDropdowns();
+            renderRules();
+            updateUI();
+            logEvent("System", "Welcome to Oakridge High. Don't forget to check the Master Schedule!", "blue");
+            generateDailyEvents();
+        }
+
+        // Helper to bound values
+        function clamp(value, min = 0, max = 100) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function updateUI() {
+            // Update Text Values
+            document.getElementById('rep-val').innerText = `${Math.round(state.reputation)}%`;
+            document.getElementById('budget-val').innerText = `$${Math.round(state.budget).toLocaleString()}`;
+            document.getElementById('student-hap-val').innerText = `${Math.round(state.studentHappiness)}%`;
+            document.getElementById('teacher-hap-val').innerText = `${Math.round(state.teacherHappiness)}%`;
+            document.getElementById('discipline-val').innerText = `${Math.round(state.discipline)}%`;
+            document.getElementById('academics-val').innerText = `${Math.round(state.academics)}%`;
+            document.getElementById('athletics-val').innerText = `${Math.round(state.athletics)}%`;
+            
+            document.getElementById('student-count').innerText = state.students;
+            document.getElementById('teacher-count').innerText = state.teachers;
+            
+            // New Staff Counts
+            if(document.getElementById('cafeteria-count')) document.getElementById('cafeteria-count').innerText = state.cafeteriaWorkers;
+            if(document.getElementById('reception-count')) document.getElementById('reception-count').innerText = state.receptionists;
+            if(document.getElementById('classroom-count')) document.getElementById('classroom-count').innerText = state.classrooms;
+            if(document.getElementById('sports-facility-count')) document.getElementById('sports-facility-count').innerText = state.sportsFacilities;
+            
+            // Facility UI updates
+            if(document.getElementById('capacity-val')) document.getElementById('capacity-val').innerText = state.classrooms * 25;
+            if(document.getElementById('facility-lvl-val')) document.getElementById('facility-lvl-val').innerText = state.sportsFacilities;
+            
+            // Disable facility buttons if not enough money
+            const buyClassroomBtn = document.getElementById('btn-buy-classroom');
+            if(buyClassroomBtn) buyClassroomBtn.disabled = state.budget < 5000;
+            const buySportsBtn = document.getElementById('btn-buy-sports');
+            if(buySportsBtn) buySportsBtn.disabled = state.budget < 15000;
+
+            document.getElementById('expelled-count').innerText = state.expelled;
+            document.getElementById('fired-count').innerText = state.fired;
+            document.getElementById('day-counter').innerText = state.day;
+
+            // Update Bars and Colors
+            updateBar('rep-bar', state.reputation);
+            updateBar('student-hap-bar', state.studentHappiness);
+            updateBar('teacher-hap-bar', state.teacherHappiness);
+            updateBar('discipline-bar', state.discipline);
+            updateBar('academics-bar', state.academics);
+            updateBar('athletics-bar', state.athletics);
+            
+            // Budget bar is scaled to MAX_BUDGET
+            const budgetPercent = Math.min((state.budget / MAX_BUDGET) * 100, 100);
+            const budgetBar = document.getElementById('budget-bar');
+            budgetBar.style.width = `${budgetPercent}%`;
+            
+            // Color budget based on level
+            if (state.budget < 10000) {
+                budgetBar.className = "stat-bar bg-red-600";
+                document.getElementById('budget-val').className = "text-red-600 font-bold";
+            } else if (state.budget < 25000) {
+                budgetBar.className = "stat-bar bg-yellow-500";
+                document.getElementById('budget-val').className = "text-yellow-600";
+            } else {
+                budgetBar.className = "stat-bar bg-green-500";
+                document.getElementById('budget-val').className = "text-green-600";
+            }
+
+            // Assembly Button State
+            const assemblyBtn = document.getElementById('assembly-btn');
+            if (assemblyBtn) {
+                if (state.assemblyCooldown > 0) {
+                    assemblyBtn.disabled = true;
+                    assemblyBtn.querySelector('.text-xs').innerText = `Cooldown: ${state.assemblyCooldown} days`;
+                } else {
+                    assemblyBtn.disabled = false;
+                    assemblyBtn.querySelector('.text-xs').innerText = `Boosts overall morale temporarily`;
+                }
+            }
+
+            // Tuition & Event Buttons
+            const chargeTuitionBtn = document.getElementById('btn-charge-tuition');
+            if (chargeTuitionBtn) {
+                if (state.tuitionCooldown > 0) {
+                    chargeTuitionBtn.disabled = true;
+                    chargeTuitionBtn.innerText = `Cooldown: ${state.tuitionCooldown} days`;
+                } else {
+                    chargeTuitionBtn.disabled = false;
+                    chargeTuitionBtn.innerText = `Charge Parents (+$50,000)`;
+                }
+            }
+
+            const hostEventBtn = document.getElementById('btn-host-event');
+            if (hostEventBtn) {
+                if (state.eventCooldown > 0) {
+                    hostEventBtn.disabled = true;
+                    document.getElementById('event-cooldown-val').innerText = state.eventCooldown;
+                } else if (state.budget < 5000) {
+                    hostEventBtn.disabled = true;
+                    document.getElementById('event-cooldown-val').innerText = "0 (Not enough funds)";
+                } else {
+                    hostEventBtn.disabled = false;
+                    document.getElementById('event-cooldown-val').innerText = "0";
+                }
+            }
+
+            // Update Notification Badges
+            const newsBadge = document.getElementById('news-badge');
+            if (state.unreadNews > 0) {
+                newsBadge.innerText = state.unreadNews;
+                newsBadge.classList.add('show');
+            } else {
+                newsBadge.classList.remove('show');
+            }
+            
+            const schedBadge = document.getElementById('schedule-badge');
+            const hasEmptySchedule = Object.values(state.schedule).some(v => v === null);
+            if (hasEmptySchedule) schedBadge.classList.add('show');
+            else schedBadge.classList.remove('show');
+
+            const hiringBadge = document.getElementById('hiring-badge');
+            if (applicantsList.length > 0) hiringBadge.classList.add('show');
+            else hiringBadge.classList.remove('show');
+
+            const actionsBadge = document.getElementById('actions-badge');
+            if (activeTroublemakers.length > 0) actionsBadge.classList.add('show');
+            else actionsBadge.classList.remove('show');
+
+            renderOfficeList();
+            checkGameOver();
+        }
+
+        function updateBar(id, value) {
+            const bar = document.getElementById(id);
+            bar.style.width = `${value}%`;
+            
+            // Generic color coding for stats
+            if (value < 30) {
+                bar.style.backgroundColor = '#ef4444'; // red
+            } else if (value < 60) {
+                bar.style.backgroundColor = '#f59e0b'; // yellow
+            } else {
+                // Keep default colors based on ID if above 60
+                if(id.includes('rep')) bar.style.backgroundColor = '#3b82f6';
+                if(id.includes('student')) bar.style.backgroundColor = '#eab308';
+                if(id.includes('teacher')) bar.style.backgroundColor = '#a855f7';
+                if(id.includes('discipline')) bar.style.backgroundColor = '#8b5cf6'; // Different shade for discipline
+                if(id.includes('academics')) bar.style.backgroundColor = '#14b8a6'; // Teal
+                if(id.includes('athletics')) bar.style.backgroundColor = '#f97316'; // Orange
+            }
+        }
+
+        function logEvent(subject, message, type = "gray") {
+            const container = document.getElementById('log-container');
+            const entry = document.createElement('div');
+            
+            let borderClass = 'border-gray-500';
+            let bgClass = 'bg-gray-50';
+            let textClass = 'text-gray-700';
+
+            if (type === 'red') { borderClass = 'border-red-500'; bgClass = 'bg-red-50'; textClass = 'text-red-700'; }
+            else if (type === 'green') { borderClass = 'border-green-500'; bgClass = 'bg-green-50'; textClass = 'text-green-700'; }
+            else if (type === 'blue') { borderClass = 'border-blue-500'; bgClass = 'bg-blue-50'; textClass = 'text-blue-700'; }
+            else if (type === 'orange') { borderClass = 'border-orange-500'; bgClass = 'bg-orange-50'; textClass = 'text-orange-700'; }
+            else if (type === 'purple') { borderClass = 'border-purple-500'; bgClass = 'bg-purple-50'; textClass = 'text-purple-700'; }
+
+            entry.className = `log-entry ${bgClass} border-l-4 ${borderClass} p-3 rounded shadow-sm text-sm`;
+            entry.innerHTML = `<span class="font-bold ${textClass}">[${subject}]</span> ${message}`;
+            
+            if (container) {
+                container.appendChild(entry);
+                container.scrollTop = container.scrollHeight;
+            }
+
+            // Increase unread news counter if we aren't currently viewing the news tab
+            const newsTab = document.getElementById('news-tab');
+            if (newsTab && !newsTab.classList.contains('active')) {
+                state.unreadNews++;
+                updateUI();
+            }
+        }
+
+        function generateName() {
+            return `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`;
+        }
+
+        function generateStaff() {
+            staffList = [];
+            for (let i = 0; i < state.teachers; i++) {
+                staffList.push({
+                    id: `staff_${i}`,
+                    name: `Mr/Ms. ${lastNames[Math.floor(Math.random() * lastNames.length)]}`,
+                    role: "Teacher",
+                    subject: subjects[Math.floor(Math.random() * subjects.length)],
+                    competence: Math.floor(Math.random() * 50) + 50
+                });
+            }
+        }
+
+        function generateApplicants() {
+            applicantsList = [];
+            let numApplicants = Math.floor(Math.random() * 3) + 2; // 2 to 4 daily applicants
+            for (let i = 0; i < numApplicants; i++) {
+                let role = jobRoles[Math.floor(Math.random() * jobRoles.length)];
+                let subj = role === "Teacher" ? subjects[Math.floor(Math.random() * subjects.length)] : null;
+                applicantsList.push({
+                    id: `app_${Date.now()}_${i}`,
+                    name: `${firstNames[Math.floor(Math.random() * firstNames.length)]} ${lastNames[Math.floor(Math.random() * lastNames.length)]}`,
+                    role: role,
+                    subject: subj,
+                    competence: Math.floor(Math.random() * 50) + 50
+                });
+            }
+            renderApplicants();
+        }
+
+        function renderApplicants() {
+            const list = document.getElementById('applicants-list');
+            if(!list) return;
+            list.innerHTML = '';
+            
+            if(applicantsList.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 italic p-4 text-center">No new applicants today. Check back tomorrow.</p>';
+                return;
+            }
+
+            applicantsList.forEach(app => {
+                const div = document.createElement('div');
+                div.className = 'p-4 bg-white border border-gray-200 rounded-lg shadow-sm flex justify-between items-center hover:border-green-300 transition';
+                
+                let compColor = app.competence > 80 ? 'text-green-600' : app.competence < 60 ? 'text-red-600' : 'text-yellow-600';
+                let specialtyTag = app.role === "Teacher" ? `Specialty: <span class="font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">${app.subject}</span>` : `<span class="font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">${app.role}</span>`;
+
+                div.innerHTML = `
+                    <div>
+                        <div class="font-bold text-gray-800 text-lg">${app.name} <span class="text-xs font-normal text-gray-500">(${app.role})</span></div>
+                        <div class="text-sm text-gray-600 mt-1">${specialtyTag}</div>
+                        <div class="text-xs text-gray-500 mt-1">Competence: <span class="font-bold ${compColor}">${app.competence}/100</span></div>
+                    </div>
+                    <button onclick="hireTeacher('${app.id}')" class="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-lg shadow transition transform active:scale-95">
+                        Hire ($${HIRE_COST})
+                    </button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function hireTeacher(id) {
+            if (state.budget < HIRE_COST) {
+                logEvent("System", "Failed to hire staff: Not enough funds.", "red");
+                if (!document.getElementById('news-tab').classList.contains('active')) {
+                    switchTab('news-tab');
+                }
+                return;
+            }
+            
+            let index = applicantsList.findIndex(a => a.id === id);
+            if (index > -1) {
+                let app = applicantsList[index];
+                state.budget -= HIRE_COST;
+                
+                // Add to active staff
+                staffList.push({
+                    id: `staff_${Date.now()}`,
+                    name: app.name,
+                    role: app.role,
+                    subject: app.subject,
+                    competence: app.competence
+                });
+                
+                if(app.role === "Teacher") state.teachers++;
+                else if(app.role === "Receptionist") state.receptionists++;
+                else if(app.role === "Cafeteria Worker") state.cafeteriaWorkers++;
+                
+                applicantsList.splice(index, 1); // Remove from list
+            
+            let logMsg = app.role === "Teacher" ? `Hired ${app.name} (${app.subject}) as a new teacher.` : `Hired ${app.name} as a ${app.role}.`;
+            logEvent("HR", logMsg, "green");
+            renderApplicants();
+            updateScheduleDropdowns();
+            updateUI();
+        }
+    }
+
+    function renderOfficeList() {
+        const list = document.getElementById('office-list');
+        const count = document.getElementById('office-count');
+        if(!list || !count) return;
+
+        count.innerText = activeTroublemakers.length;
+
+        if (activeTroublemakers.length === 0) {
+            list.innerHTML = '<p class="text-gray-500 italic text-center mt-6">The office is empty. No incidents to handle.</p>';
+            return;
+        }
+
+        list.innerHTML = '';
+        activeTroublemakers.forEach(student => {
+            const div = document.createElement('div');
+            div.className = 'p-3 bg-white border border-gray-200 rounded-lg shadow-sm cursor-pointer hover:border-blue-400 hover:shadow-md transition';
+            div.onclick = () => openPunishmentModal(student.id);
+            div.innerHTML = `
+                <div class="font-bold text-gray-800 flex justify-between items-center mb-1">
+                    <span>${student.name}</span>
+                    <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Severity: ${"⭐".repeat(student.severity)}</span>
+                </div>
+                <div class="text-xs text-gray-600 line-clamp-2">...${student.reason}</div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function buyFacility(type) {
+        if (type === 'classroom' && state.budget >= 5000) {
+                state.budget -= 5000;
+                state.classrooms++;
+                logEvent("Facilities", "Purchased a new portable classroom. Total capacity increased to " + (state.classrooms * 25) + ".", "green");
+            } else if (type === 'sports' && state.budget >= 15000) {
+                state.budget -= 15000;
+                state.sportsFacilities++;
+                state.athletics = clamp(state.athletics + 10);
+                logEvent("Facilities", "Renovated sports facilities! The Athletics teams are thrilled.", "purple");
+            }
+            updateUI();
+        }
+
+        function generateDailyEvents(silent = false) {
+            if(!silent) activeTroublemakers = [];
+            let numEvents = Math.floor(Math.random() * 3) + 1; // 1 to 3 incidents
+            
+            // Higher discipline = fewer incidents
+            if (state.discipline > 70) numEvents = Math.max(0, numEvents - 1);
+            if (state.discipline < 30) numEvents += 1;
+            
+            // More rules = slightly higher chance of incidents catching people
+            numEvents += Math.floor(state.rules.length / 3);
+
+            for (let i = 0; i < numEvents; i++) {
+                let name = generateName();
+                let reason = "";
+                
+                // 50% chance to break a custom rule if they exist
+                if (state.rules.length > 0 && Math.random() > 0.5) {
+                    let brokenRule = state.rules[Math.floor(Math.random() * state.rules.length)];
+                    reason = `was caught by staff breaking the rule: "${brokenRule}".`;
+                } else {
+                    reason = troublemakerReasons[Math.floor(Math.random() * troublemakerReasons.length)];
+                }
+                
+                let student = {
+                    id: `student_${Date.now()}_${i}`,
+                    name: name,
+                    reason: reason,
+                    severity: Math.floor(Math.random() * 3) + 1 // 1: Low, 2: Med, 3: High
+                };
+                
+                activeTroublemakers.push(student);
+                if(!silent) logEvent("Incident", `${student.name} ${student.reason} Sent to your office.`, "orange");
+                
+                // Unhandled events hurt stats slightly immediately
+                state.reputation = clamp(state.reputation - (student.severity * 0.5));
+                state.discipline = clamp(state.discipline - (student.severity * 1));
+            }
+            
+            if(!silent) updateUI();
+        }
+
+        function processDay(silent = false) {
+            // Calculate daily changes
+            let totalStaff = state.teachers + state.receptionists + state.cafeteriaWorkers;
+            let dailyCost = DAILY_BUDGET_DROP + (totalStaff * TEACHER_SALARY);
+            state.budget -= dailyCost;
+            
+            // --- Process Schedule Effectiveness ---
+            const requiredSubjects = ["Math", "Science", "History", "English", "P.E.", "Language"];
+            let unassignedClasses = 0;
+            let teachingBonus = 0;
+            
+            for (const subj of requiredSubjects) {
+                let teacherId = state.schedule[subj];
+                if (!teacherId) {
+                    unassignedClasses++;
+                } else {
+                    let teacher = staffList.find(t => t.id === teacherId);
+                    if (teacher) {
+                        // Bonus if teaching their specialty
+                        if (teacher.subject === subj) teachingBonus += 2;
+                        // Penalty if competence is low
+                        if (teacher.competence < 60) teachingBonus -= 1;
+                    }
+                }
+            }
+
+            // Apply schedule effects
+            if (unassignedClasses > 0) {
+                state.academics = clamp(state.academics - (unassignedClasses * 5));
+                state.reputation = clamp(state.reputation - (unassignedClasses * 2));
+                if (!silent && Math.random() > 0.5) logEvent("Academics", `${unassignedClasses} core subjects lack teachers! Parents are furious.`, "red");
+            } else {
+                state.academics = clamp(state.academics + teachingBonus);
+            }
+
+            if (state.discipline > 80) {
+                state.studentHappiness = clamp(state.studentHappiness - 4); // Too strict
+                state.teacherHappiness = clamp(state.teacherHappiness + 2); // Teachers like order
+                if(!silent && Math.random() > 0.8) logEvent("Daily Report", "Strict rules are keeping order, but students are unhappy.", "blue");
+            }
+
+            // Facilities and Academics Logic
+            const capacity = state.classrooms * 25;
+            if (state.students > capacity) {
+                state.academics = clamp(state.academics - 2);
+                state.studentHappiness = clamp(state.studentHappiness - 1);
+                if(!silent && Math.random() > 0.7) logEvent("Facilities", "The school is overcrowded! Academics and morale are suffering. Build more classrooms.", "red");
+            } else {
+                if (unassignedClasses === 0) state.academics = clamp(state.academics + 0.5);
+            }
+
+            // Athletics passive
+            if (state.sportsFacilities > 0) {
+                state.athletics = clamp(state.athletics + (state.sportsFacilities * 0.2));
+            }
+
+            // Apply sports/academics benefits
+            if (state.athletics > 80) {
+                state.reputation = clamp(state.reputation + 0.5);
+                state.studentHappiness = clamp(state.studentHappiness + 0.5);
+                if(!silent && Math.random() > 0.9) logEvent("Sports", "The school team won a big game thanks to our facilities! Morale is up.", "green");
+            } else if (state.athletics < 30) {
+                if(!silent && Math.random() > 0.9) logEvent("Sports", "The school team suffered a humiliating defeat. Invest in sports facilities.", "orange");
+            }
+
+            if (state.academics > 80) {
+                state.reputation = clamp(state.reputation + 1);
+                if(!silent && Math.random() > 0.9) logEvent("Academics", "Students are scoring exceptionally high on state tests! Reputation boost.", "blue");
+            }
+
+            // Passive rule penalty
+            if (state.rules.length > 3) {
+                 state.studentHappiness = clamp(state.studentHappiness - Math.floor(state.rules.length / 2));
+                 if(!silent && Math.random() > 0.8) logEvent("Student Body", "Students are complaining about having too many rules.", "orange");
+            }
+
+            // Ratio issues
+            const studentTeacherRatio = state.students / Math.max(1, state.teachers);
+            if (studentTeacherRatio > 25) {
+                state.teacherHappiness = clamp(state.teacherHappiness - 5);
+                state.reputation = clamp(state.reputation - 2);
+                if(!silent) logEvent("Daily Report", "Classes are overcrowded. Teachers are overwhelmed.", "red");
+            }
+
+            // Support staff benefits
+            state.studentHappiness = clamp(state.studentHappiness + (state.cafeteriaWorkers * 0.5));
+            state.reputation = clamp(state.reputation + (state.receptionists * 0.5));
+
+            // Income (Funding based on reputation and student count)
+            let dailyFunding = Math.floor((state.students * 5) * (state.reputation / 100));
+            state.budget += dailyFunding;
+
+            // Cooldowns
+            if (state.assemblyCooldown > 0) state.assemblyCooldown--;
+            if (state.tuitionCooldown > 0) state.tuitionCooldown--;
+            if (state.eventCooldown > 0) state.eventCooldown--;
+
+            // New Day Cleanup
+            state.day++;
+            if(!silent) {
+                logEvent("---", `Day ${state.day} Begins. Daily Budget Change: -$${dailyCost}, Funding: +$${dailyFunding}`, "gray");
+                generateApplicants(); // Refresh applicants
+            }
+            
+            // Clear old unhandled troublemakers
+            if (activeTroublemakers.length > 0) {
+                let penalty = activeTroublemakers.length * 2;
+                state.discipline = clamp(state.discipline - penalty);
+                state.reputation = clamp(state.reputation - (penalty/2));
+                if(!silent) logEvent("System", `${activeTroublemakers.length} incidents went unpunished yesterday. Discipline drops.`, "red");
+            }
+
+            if(!silent) {
+                generateDailyEvents();
+                updateUI();
+            } else {
+                // Vice Principal auto-handles incidents poorly during simulation
+                activeTroublemakers = [];
+                generateDailyEvents(true); // Generates some silent incidents
+                // Auto punish clears them but causes slight morale hit
+                activeTroublemakers = [];
+                state.studentHappiness = clamp(state.studentHappiness - 1);
+            }
+        }
+
+        // Advance to next day button
+        document.getElementById('next-day-btn').addEventListener('click', () => {
+            processDay(false);
+        });
+
+        async function simulateYear() {
+            const btn = document.getElementById('sim-year-btn');
+            btn.disabled = true;
+            btn.innerText = "Simulating...";
+            
+            // Brief timeout to let UI update button state
+            await new Promise(r => setTimeout(r, 100));
+            
+            let daysSimulated = 0;
+            for(let i=0; i<180; i++) {
+                if (checkGameOver(true)) { // Check silently
+                    break;
+                }
+                processDay(true); // Silent day
+                daysSimulated++;
+            }
+            
+            updateUI();
+            generateApplicants();
+            logEvent("Simulation", `Fast-forwarded ${daysSimulated} days. Vice Principal handled daily incidents, but probably not as well as you. Check your stats!`, "purple");
+            
+            btn.disabled = false;
+            btn.innerText = "Simulate Year (180 Days)";
+            checkGameOver(); // Trigger actual visual game over if hit during sim
+        }
+
+        // --- Rules Logic ---
+        function addRule() {
+            const input = document.getElementById('new-rule-input');
+            const val = input.value.trim();
+            if(val) {
+                state.rules.push(val);
+                input.value = "";
+                renderRules();
+                logEvent("System", `New school rule implemented: "${val}"`, "blue");
+                
+                // Switch focus to rules tab visually if triggered externally
+                if(!document.getElementById('rules-tab').classList.contains('active')) switchTab('rules-tab');
+            }
+        }
+
+        function deleteRule(index) {
+            state.rules.splice(index, 1);
+            renderRules();
+        }
+
+        function renderRules() {
+            const list = document.getElementById('rules-list');
+            if(!list) return;
+            list.innerHTML = '';
+            
+            if(state.rules.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 italic p-4 text-center">No custom rules active. Students only follow standard guidelines.</p>';
+                return;
+            }
+
+            state.rules.forEach((rule, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-white border border-gray-200 rounded-lg shadow-sm flex justify-between items-center';
+                
+                div.innerHTML = `
+                    <span class="font-medium text-gray-800 break-words flex-grow mr-4">"${rule}"</span>
+                    <button onclick="deleteRule(${index})" class="text-red-500 hover:text-red-700 font-bold p-2 transition">
+                        Remove
+                    </button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // --- Modal & Action Logic ---
+
+        function openModal(actionType) {
+            state.currentActionType = actionType;
+            state.selectedTargetId = null;
+            document.getElementById('confirm-action-btn').disabled = true;
+            
+            const modalTitle = document.getElementById('modal-title');
+            const modalDesc = document.getElementById('modal-desc');
+            const listContainer = document.getElementById('target-list');
+            listContainer.innerHTML = ''; // clear
+
+            if (actionType === 'fire') {
+                modalTitle.innerText = "Fire Staff Member";
+                modalDesc.innerText = "Select a staff member to terminate. Warning: Damages staff morale.";
+                document.getElementById('confirm-action-btn').style.display = 'block';
+
+                staffList.forEach(staff => {
+                    const div = document.createElement('div');
+                    div.className = 'list-item p-3 border-b flex justify-between items-center transition';
+                    div.onclick = () => selectItem(div, staff.id);
+                    
+                    let roleDisplay = staff.role === "Teacher" ? staff.subject : staff.role;
+                    
+                    div.innerHTML = `
+                        <span class="font-bold text-gray-800">${staff.name}</span>
+                        <span class="text-xs bg-gray-200 px-2 py-1 rounded text-gray-700">${roleDisplay}</span>
+                    `;
+                    listContainer.appendChild(div);
+                });
+            }
+            else if (actionType === 'meeting') {
+                modalTitle.innerText = "Parent-Teacher Meetings";
+                modalDesc.innerText = "Organize meetings to discuss student progress. Cost: $500.";
+                document.getElementById('confirm-action-btn').style.display = 'block';
+                
+                // Just an informational modal for this action, no list needed
+                listContainer.innerHTML = `
+                    <div class="p-6 text-center text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <p>Improves reputation slightly and boosts teacher morale, but costs school funds.</p>
+                    </div>
+                `;
+                // Auto-select true so confirm button works
+                state.selectedTargetId = 'all'; 
+                document.getElementById('confirm-action-btn').disabled = false;
+            }
+
+            // Show Modal
+            const modal = document.getElementById('action-modal');
+            modal.style.display = 'flex';
+            // slight delay to allow display:flex to apply before adding opacity class
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('action-modal');
+            modal.classList.remove('show');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+
+        function openPunishmentModal(studentId) {
+            state.selectedTargetId = studentId;
+            let student = activeTroublemakers.find(s => s.id === studentId);
+            if(!student) return;
+
+            document.getElementById('punish-student-name').innerText = student.name;
+            document.getElementById('punish-student-reason').innerText = student.reason;
+
+            // Reset checkboxes
+            document.getElementById('punish-fine').checked = false;
+            document.getElementById('punish-suspend').checked = false;
+            document.getElementById('punish-expel').checked = false;
+            if(document.getElementById('punish-meeting')) document.getElementById('punish-meeting').checked = false;
+
+            const modal = document.getElementById('punishment-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function closePunishmentModal() {
+            const modal = document.getElementById('punishment-modal');
+            modal.classList.remove('show');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+
+        function applyPunishment() {
+            if (!state.selectedTargetId) return;
+            let studentIndex = activeTroublemakers.findIndex(s => s.id === state.selectedTargetId);
+            if (studentIndex === -1) return;
+
+            let student = activeTroublemakers[studentIndex];
+
+            let isFine = document.getElementById('punish-fine').checked;
+            let isSuspend = document.getElementById('punish-suspend').checked;
+            let isExpel = document.getElementById('punish-expel').checked;
+            let isMeeting = document.getElementById('punish-meeting') ? document.getElementById('punish-meeting').checked : false;
+
+            if (isMeeting) {
+                // Save the other punishments to be applied AFTER the meeting
+                pendingPunishmentData = { studentId: student.id, isFine, isSuspend, isExpel };
+                closePunishmentModal();
+                startParentMeeting(student);
+                return;
+            }
+
+            executePunishment(student, studentIndex, isFine, isSuspend, isExpel, false);
+        }
+
+        function executePunishment(student, studentIndex, isFine, isSuspend, isExpel, hadMeeting) {
+            let actionMsgs = [];
+            let disciplineBoost = 0;
+            let happinessHit = 0;
+            let repHit = 0;
+
+            if (!isFine && !isSuspend && !isExpel) {
+                // Just a warning (or just a meeting)
+                disciplineBoost += student.severity * 2;
+                actionMsgs.push(hadMeeting ? "had a meeting with their parents" : "gave them a stern warning");
+            } else {
+                if (hadMeeting) actionMsgs.push("met with parents");
+                if (isFine) {
+                    state.budget += 100;
+                    repHit += 2;
+                    happinessHit += 2;
+                    actionMsgs.push("fined them $100");
+                }
+                if (isSuspend) {
+                    disciplineBoost += student.severity * 5;
+                    happinessHit += 4;
+                    actionMsgs.push("suspended them");
+                }
+                if (isExpel) {
+                    disciplineBoost += 15;
+                    happinessHit += 10;
+                    repHit += 5;
+                    state.students--;
+                    state.expelled++;
+                    actionMsgs.push("expelled them permanently");
+                }
+            }
+
+            state.discipline = clamp(state.discipline + disciplineBoost);
+            state.studentHappiness = clamp(state.studentHappiness - happinessHit);
+            state.reputation = clamp(state.reputation - repHit);
+
+            logEvent("Discipline", `Dealt with ${student.name}: ${actionMsgs.join(" and ")}.`, isExpel ? "red" : (isSuspend ? "orange" : "blue"));
+
+            activeTroublemakers.splice(studentIndex, 1);
+            if(document.getElementById('punishment-modal').classList.contains('show')) closePunishmentModal();
+            updateUI();
+        }
+
+        function startParentMeeting(student) {
+            document.getElementById('meeting-title').innerText = `Meeting with ${student.name.split(' ')[1]}'s Parents`;
+            document.getElementById('meeting-context').innerText = `Incident: ${student.name} ${student.reason}`;
+            
+            const chatLog = document.getElementById('meeting-chat-log');
+            chatLog.innerHTML = ''; // Clear old chat
+            
+            document.getElementById('meeting-input').value = '';
+            
+            const modal = document.getElementById('parent-meeting-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+            
+            // Initial parent message
+            setTimeout(() => {
+                appendChatMessage(`Hello Principal. We got your message about ${student.name}. What is this regarding?`, 'parent');
+            }, 500);
+            
+            // Allow Enter key to send
+            document.getElementById('meeting-input').onkeyup = function(e) {
+                if (e.key === 'Enter') sendMeetingMessage();
+            };
+        }
+
+        function appendChatMessage(text, sender) {
+            const chatLog = document.getElementById('meeting-chat-log');
+            const msgDiv = document.createElement('div');
+            
+            if (sender === 'principal') {
+                msgDiv.className = 'self-end bg-purple-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[80%] shadow-sm';
+                msgDiv.innerHTML = `<p class="text-xs text-purple-200 mb-1 font-bold">You</p><p>${text}</p>`;
+            } else {
+                msgDiv.className = 'self-start bg-white border border-gray-200 text-gray-800 p-3 rounded-2xl rounded-tl-none max-w-[80%] shadow-sm';
+                msgDiv.innerHTML = `<p class="text-xs text-gray-500 mb-1 font-bold">Parents</p><p>${text}</p>`;
+            }
+            
+            chatLog.appendChild(msgDiv);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function sendMeetingMessage() {
+            const input = document.getElementById('meeting-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            appendChatMessage(text, 'principal');
+            input.value = '';
+            
+            // Generate Parent Response
+            setTimeout(() => {
+                const response = generateParentResponse(text);
+                appendChatMessage(response, 'parent');
+            }, Math.random() * 1000 + 800); // 0.8s to 1.8s delay for realism
+        }
+
+        function generateParentResponse(inputText) {
+            const lowerText = inputText.toLowerCase();
+            let hasHarsh = harshWords.some(w => lowerText.includes(w));
+            let hasSoft = softWords.some(w => lowerText.includes(w));
+            
+            let responsePool = [];
+            
+            // Logic to choose response category based on sentiment
+            if (hasHarsh && !hasSoft) {
+                // High chance of defensive or angry, some apologetic
+                let roll = Math.random();
+                if (roll < 0.4) responsePool = parentResponses.angry;
+                else if (roll < 0.8) responsePool = parentResponses.defensive;
+                else responsePool = parentResponses.apologetic;
+                
+                // Slight reputation hit for being overly harsh to parents
+                if(Math.random() > 0.5) state.reputation = clamp(state.reputation - 0.5);
+                
+            } else if (hasSoft && !hasHarsh) {
+                // High chance of positive/apologetic or neutral
+                let roll = Math.random();
+                if (roll < 0.6) responsePool = parentResponses.apologetic;
+                else responsePool = parentResponses.neutral;
+                
+                // Slight reputation boost for handling it softly
+                if(Math.random() > 0.5) state.reputation = clamp(state.reputation + 0.5);
+                
+            } else {
+                // Mixed or neutral input
+                let roll = Math.random();
+                if (roll < 0.4) responsePool = parentResponses.neutral;
+                else if (roll < 0.7) responsePool = parentResponses.defensive;
+                else responsePool = parentResponses.apologetic;
+            }
+            
+            updateUI(); // In case reputation changed invisibly
+            
+            // Pick a random response from the chosen pool
+            return responsePool[Math.floor(Math.random() * responsePool.length)];
+        }
+
+        function endParentMeeting() {
+            const modal = document.getElementById('parent-meeting-modal');
+            modal.classList.remove('show');
+            setTimeout(() => modal.style.display = 'none', 300);
+            
+            if (pendingPunishmentData) {
+                let studentIndex = activeTroublemakers.findIndex(s => s.id === pendingPunishmentData.studentId);
+                if (studentIndex > -1) {
+                    let student = activeTroublemakers[studentIndex];
+                    // Execute the punishments that were checked alongside the meeting
+                    executePunishment(student, studentIndex, pendingPunishmentData.isFine, pendingPunishmentData.isSuspend, pendingPunishmentData.isExpel, true);
+                }
+                pendingPunishmentData = null;
+            }
+        }
+
+        function selectItem(element, id) {
+            // Remove selected class from all
+            document.querySelectorAll('.list-item').forEach(el => el.classList.remove('selected-item'));
+            
+            // Add to clicked
+            element.classList.add('selected-item');
+            
+            state.selectedTargetId = id;
+            
+            // Enable confirm button
+            const confirmBtn = document.getElementById('confirm-action-btn');
+            
+            // Styling based on action type for the confirm button
+            confirmBtn.disabled = false;
+            confirmBtn.className = "px-4 py-2 text-white font-bold rounded-lg shadow transition ";
+            
+            if (state.currentActionType === 'fire') {
+                confirmBtn.className += "bg-red-600 hover:bg-red-700 pulse-red";
+                confirmBtn.innerText = "Terminate Contract";
+            } else {
+                confirmBtn.className += "bg-blue-600 hover:bg-blue-700";
+                confirmBtn.innerText = "Confirm";
+            }
+        }
+
+        // Handle Confirm Button Click
+        document.getElementById('confirm-action-btn').addEventListener('click', () => {
+            
+            let type = state.currentActionType;
+            let id = state.selectedTargetId;
+
+            if (type === 'meeting') {
+                if (state.budget >= 500) {
+                    state.budget -= 500;
+                    state.reputation = clamp(state.reputation + 5);
+                    state.teacherHappiness = clamp(state.teacherHappiness + 8);
+                    logEvent("Action", "Organized Parent-Teacher meetings. Cost $500. Parents are pleased.", "green");
+                } else {
+                    logEvent("Warning", "Not enough budget for meetings.", "red");
+                }
+                closeModal();
+                updateUI();
+                return;
+            }
+
+            // Staff Actions
+            if (type === 'fire') {
+                let staffIndex = staffList.findIndex(s => s.id === id);
+                if (staffIndex > -1) {
+                    let staff = staffList[staffIndex];
+                    
+                    if (staff.role === "Teacher") state.teachers--;
+                    else if (staff.role === "Receptionist") state.receptionists--;
+                    else if (staff.role === "Cafeteria Worker") state.cafeteriaWorkers--;
+                    
+                    state.fired++;
+                    state.teacherHappiness = clamp(state.teacherHappiness - (staff.role === "Teacher" ? 25 : 10)); 
+                    state.reputation = clamp(state.reputation - 5);
+                    logEvent("Action", `Terminated contract for ${staff.name} (${staff.role}).`, "red");
+                    
+                    // Remove from schedule if assigned
+                    if (staff.role === "Teacher") {
+                        for (const subj in state.schedule) {
+                            if (state.schedule[subj] === staff.id) {
+                                state.schedule[subj] = null;
+                                logEvent("Warning", `${subj} class is now unassigned due to firing!`, "orange");
+                            }
+                        }
+                    }
+
+                    staffList.splice(staffIndex, 1);
+                    updateScheduleDropdowns();
+                }
+            }
+
+            closeModal();
+            updateUI();
+        });
+
+        // Special standalone action
+        function holdAssembly() {
+            if (state.assemblyCooldown === 0) {
+                state.studentHappiness = clamp(state.studentHappiness + 15);
+                state.teacherHappiness = clamp(state.teacherHappiness + 5);
+                state.assemblyCooldown = 5; // Can't use again for 5 days
+                logEvent("Action", "Held an inspiring school assembly. Morale boosted!", "purple");
+                updateUI();
+            }
+        }
+
+        function checkGameOver(silent = false) {
+            let gameOver = false;
+            let reason = "";
+
+            if (state.budget < -10000) {
+                gameOver = true;
+                reason = "The school has gone hopelessly bankrupt under your management.";
+            } else if (state.reputation <= 10) {
+                gameOver = true;
+                reason = "The school's reputation is in ruins. Parents are pulling their children out.";
+            } else if (state.teacherHappiness <= 10) {
+                gameOver = true;
+                reason = "The teachers have gone on an indefinite strike due to miserable working conditions.";
+            } else if (state.students <= 0) {
+                 gameOver = true;
+                 reason = "There are no students left to teach.";
+            } else if (state.teachers <= 0) {
+                 gameOver = true;
+                 reason = "You fired all the teachers. Who is supposed to run the classes?";
+            }
+
+            if (gameOver && !silent) {
+                document.getElementById('game-over-reason').innerText = reason;
+                document.getElementById('final-days').innerText = state.day;
+                document.getElementById('game-over-modal').classList.add('show');
+                // Disable background interactions
+                document.querySelectorAll('.action-button').forEach(btn => btn.disabled = true);
+            }
+            return gameOver;
+        }
+
+        function switchTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            // Show target tab
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById(`btn-${tabId}`).classList.add('active');
+            
+            // Clear news badge if news tab is clicked
+            if (tabId === 'news-tab') {
+                state.unreadNews = 0;
+                updateUI();
+                
+                // Scroll to bottom immediately upon revealing tab
+                const container = document.getElementById('log-container');
+                if(container) container.scrollTop = container.scrollHeight;
+            }
+        }
+
+        function updateScheduleDropdowns() {
+            const coreSubjects = ['Math', 'Science', 'History', 'English', 'P.E.', 'Language'];
+            
+            coreSubjects.forEach(subj => {
+                const select = document.getElementById(`sched-${subj}`);
+                if (!select) return;
+                
+                // Keep current selection if valid
+                const currentVal = state.schedule[subj];
+                
+                select.innerHTML = '<option value="">-- Assign a Teacher --</option>';
+                
+                // Sort staff so specialists in the subject are at the top, filter out non-teachers
+                const sortedStaff = [...staffList].filter(s => s.role === "Teacher").sort((a, b) => {
+                    if(a.subject === subj && b.subject !== subj) return -1;
+                    if(b.subject === subj && a.subject !== subj) return 1;
+                    return 0;
+                });
+
+                sortedStaff.forEach(staff => {
+                    const isSpecialty = staff.subject === subj;
+                    const option = document.createElement('option');
+                    option.value = staff.id;
+                    option.text = `${staff.name} ${isSpecialty ? '(★ Specialty)' : `(${staff.subject})`}`;
+                    
+                    if (isSpecialty) option.className = "font-bold text-indigo-700";
+
+                    if (currentVal === staff.id) option.selected = true;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        function assignSchedule(subject, teacherId) {
+            state.schedule[subject] = teacherId || null;
+            updateUI();
+        }
+
+        function chargeTuition() {
+            if (state.tuitionCooldown > 0) return;
+            state.budget += 50000;
+            // Massive penalties for extorting parents
+            state.reputation = clamp(state.reputation - 25);
+            state.studentHappiness = clamp(state.studentHappiness - 15);
+            state.tuitionCooldown = 30; // 30 day cooldown
+            logEvent("Finance", "Charged a mandatory $50,000 Facility Fee! The budget is booming, but the parents are absolutely furious.", "emerald");
+            updateUI();
+        }
+
+        function hostEvent() {
+            if (state.eventCooldown > 0 || state.budget < 5000) return;
+            state.budget -= 5000;
+            // Great boosts for throwing a fun event
+            state.reputation = clamp(state.reputation + 10);
+            state.studentHappiness = clamp(state.studentHappiness + 20);
+            state.eventCooldown = 15; // 15 day cooldown
+            logEvent("Event", "Hosted a massive school event! The students and community loved it.", "purple");
+            updateUI();
+        }
+
+        // Start the game
+        window.onload = init;
+
+    </script>
+</body>
+</html>
